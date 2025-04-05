@@ -24,7 +24,7 @@ if (!file.exists(pdf_path)) {
     stop(paste("File not found:", pdf_path))
 }
 
-
+#
 
 text <- pdf_text(pdf_path)
 text_name <- basename(pdf_path)
