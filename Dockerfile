@@ -34,7 +34,7 @@ RUN R -e "install.packages(c('devtools'), repos='https://cran.rstudio.com/')"
 RUN R -e "install.packages(c('cluster', 'stats', 'tools'), repos='https://cran.rstudio.com/')"
 
 # Install remaining packages
-RUN R -e "install.packages(c('pdftools', 'magick', 'cluster', 'factoextra', 'dendextend', 'grid', 'gridExtra', 'dplyr', 'ggplot2', 'ppcor', 'reshape2', 'png'), repos='https://cran.rstudio.com/', dependencies=TRUE)"
+RUN R -e "install.packages(c('pdftools', 'magick', 'dendextend', 'grid', 'gridExtra', 'dplyr', 'ggplot2', 'ppcor', 'reshape2', 'png'), repos='https://cran.rstudio.com/', dependencies=TRUE)"
 
 # Install FactoMineR (must be installed before factoextra)
 RUN R -e "install.packages('FactoMineR', repos='https://cran.rstudio.com/', dependencies=TRUE)"
@@ -50,7 +50,6 @@ WORKDIR /app
 COPY process_pdf.R /app/
 COPY server.py /app/
 COPY requirements.txt /app/
-COPY index.html /app/
 COPY EVS_Base_1.1.pdf /app/
 
 # Make sure the R script is executable
