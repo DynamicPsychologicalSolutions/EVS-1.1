@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Processing Service</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        h1 {
+            color: #333;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 10px;
+        }
+        .upload-container {
+            border: 2px dashed #ccc;
+            border-radius: 5px;
+            padding: 20px;
+            text-align: center;
+            margin: 20px 0;
+            background-color: #f9f9f9;
+        }
+        .upload-container:hover {
+            border-color: #999;
+        }
+        #file-input {
+            display: none;
+        }
+        .upload-btn {
+            background-color: #C80000;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+        .upload-btn:hover {
+            background-color: #C80000;
+        }
+        .file-info {
+            margin-top: 15px;
+            font-size: 14px;
+        }
+        #status {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 4px;
+            display: none;
+        }
+        .success {
+            background-color: #FFAFAF;
+            color: #3c763d;
+        }
+        .error {
+            background-color: #f2dede;
+            color: #a94442;
+        }
+        .loading {
+            background-color: #d9edf7;
+            color: #31708f;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 2s linear infinite;
+            margin: 10px auto;
+            display: none;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <h1>EVS 1.1 File Converter</h1>
+    
+    <p>Upload LOOK Assessment Output PDF fule for EVS analysis. <br>
+The service will return a processed PDF with EVS analysis results.</p>
+    
+    <div class="upload-container">
+        <div id="drop-area">
+            <input type="file" id="file-input" accept=".pdf" />
+            <button class="upload-btn" id="select-file-btn">Select PDF File</button>
+            <div class="file-info" id="file-info"></div>
+        </div>
+    </div>
+    
+    <button class="upload-btn" id="upload-btn" style="display: none;">Process PDF</button>
+    
+    <div id="spinner" class="spinner"></div>
+    <div id="status"></div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const fileInput = document.getElementById('file-input');
+            const selectFileBtn = document.getElementById('select-file-btn');
+            const uploadBtn = document.getElementById('upload-btn');
+            const fileInfo = document.getElementById('file-info');
+            const dropArea = document.getElementById('drop-area');
+            const status = document.getElementById('status');
+            const spinner = document.getElementById('spinner');
+            
+            // Open file selector when button is clicked
+            selectFileBtn.addEventListener('click', function() {
+                fileInput.click();
+            });
+            
+            // Handle selected file
+            fileInput.addEventListener('change', function() {
+                handleFiles(this.files);
+            });
+            
+            // Prevent default drag behaviors
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropArea.addEventListener(eventName, preventDefaults, false);
+            });
+            
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            
+            // Highlight drop area when item is dragged over it
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropArea.addEventListener(eventName, highlight, false);
+            });
+            
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropArea.addEventListener(eventName, unhighlight, false);
+            });
+            
+            function highlight() {
+                dropArea.style.borderColor = '#4CAF50';
+            }
+            
+            function unhighlight() {
+                dropArea.style.borderColor = '#ccc';
+            }
+            
+            // Handle dropped files
+            dropArea.addEventListener('drop', function(e) {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                handleFiles(files);
+            });
+            
+            function handleFiles(files) {
+                if (files.length > 0) {
+                    const file = files[0];
+                    if (file.type === 'application/pdf') {
+                        fileInfo.textContent = `Selected file: ${file.name} (${formatFileSize(file.size)})`;
+                        uploadBtn.style.display = 'block';
+                    } else {
+                        fileInfo.textContent = 'Please select a PDF file.';
+                        uploadBtn.style.display = 'none';
+                    }
+                }
+            }
+            
+            function formatFileSize(bytes) {
+                if (bytes < 1024) return bytes + ' bytes';
+                else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+                else return (bytes / 1048576).toFixed(1) + ' MB';
+            }
+            
+            // Handle upload
+            uploadBtn.addEventListener('click', function() {
+                if (!fileInput.files.length) return;
+                
+                const file = fileInput.files[0];
+                const formData = new FormData();
+                formData.append('file', file);
+                
+                // Show loading state
+                spinner.style.display = 'block';
+                status.style.display = 'block';
+                status.className = 'loading';
+                status.textContent = 'Processing your PDF...';
+                uploadBtn.disabled = true;
+                
+                // Set to the correct endpoint
+                const serviceUrl = window.location.origin + '/process-pdf';
+                
+                fetch(serviceUrl, {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        if (response.headers.get('content-type')?.includes('application/json')) {
+                            return response.json().then(data => {
+                                throw new Error(data.error || 'Unknown error occurred');
+                            });
+                        } else {
+                            throw new Error(`Server error: ${response.status} ${response.statusText}`);
+                        }
+                    }
+                    return response.blob();
+                })
+                .then(blob => {
+                    // Success - offer file download
+                    spinner.style.display = 'none';
+                    status.className = 'success';
+                    status.innerHTML = 'PDF processed successfully! <a id="download-link" href="#">Download processed PDF</a>';
+                    
+                    const downloadLink = document.getElementById('download-link');
+                    const url = window.URL.createObjectURL(blob);
+                    downloadLink.href = url;
+                    downloadLink.download = 'EVS_Report.pdf';
+                    downloadLink.addEventListener('click', function() {
+                        // Clean up the URL object after download
+                        setTimeout(() => window.URL.revokeObjectURL(url), 100);
+                    });
+                    
+                    uploadBtn.disabled = false;
+                })
+                .catch(error => {
+                    // Error handling
+                    spinner.style.display = 'none';
+                    status.className = 'error';
+                    status.textContent = `Error: ${error.message}`;
+                    console.error('Processing error:', error);
+                    uploadBtn.disabled = false;
+                });
+            });
+        });
+    </script>
+</body>
+</html>
