@@ -3,9 +3,9 @@ options:
 steps:
   # Build the container image
   - name: 'gcr.io/cloud-builders/docker'
-  - args: ['build', '-t', 'gcr.io/$PROJECT_ID/pdf-processor:$COMMIT_SHA', '.']
-  options:
-     machineType: 'E2_HIGHCPU_8'
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/pdf-processor:$COMMIT_SHA', '.']
+    options:
+      machineType: 'E2_HIGHCPU_8'
   
   # Push the container image to Container Registry
   - name: 'gcr.io/cloud-builders/docker'
