@@ -51,6 +51,7 @@ COPY process_pdf.R /app/
 COPY server.py /app/
 COPY requirements.txt /app/
 COPY EVS_Base_1.1.pdf /app/
+COPY index.html /app/
 
 # Make sure the R script is executable
 RUN chmod +x /app/process_pdf.R
