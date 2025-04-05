@@ -14,6 +14,14 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__, static_folder='.')
 CORS(app)  # Enable CORS for all routes
 
+CORS(app, resources={
+    r"/*": {
+        "origins": "https://your-website.com",  # Replace with your website URL
+        "methods": ["POST", "GET", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"]
+    }
+})
+
 @app.route("/", methods=["GET"])
 def index():
     """Serve the index.html file."""
