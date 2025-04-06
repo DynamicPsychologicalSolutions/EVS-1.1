@@ -12,11 +12,11 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__, static_folder='.')
-CORS(app)  # Enable CORS for all routes
 
+# Configure CORS properly for your Squarespace domain
 CORS(app, resources={
     r"/*": {
-        "origins": "https://your-website.com",  # Replace with your website URL
+        "origins": ["https://www.dynamicpsych.net", "https://dynamicpsych.net", "http://www.dynamicpsych.net", "http://dynamicpsych.net"],
         "methods": ["POST", "GET", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization"]
     }
@@ -51,12 +51,21 @@ def debug_info():
         "working_directory": os.getcwd()
     })
 
-@app.route("/process-pdf", methods=["POST"])
+@app.route("/process-pdf", methods=["POST", "OPTIONS"])
 def process_pdf():
     """
     Process uploaded PDF using the R script and return the processed PDF.
     Expects a multipart/form-data request with a 'file' field.
     """
+    # Handle preflight OPTIONS request explicitly
+    if request.method == "OPTIONS":
+        response = make_response()
+        response.headers.add("Access-Control-Allow-Origin", "*")  # During development
+        response.headers.add("Access-Control-Allow-Headers", "Content-Type")
+        response.headers.add("Access-Control-Allow-Methods", "POST, OPTIONS")
+        response.headers.add("Access-Control-Max-Age", "3600")
+        return response
+        
     try:
         # Check if file was included in request
         if 'file' not in request.files:
@@ -150,11 +159,15 @@ def process_pdf():
         logger.info(f"Found output file at {expected_output_path}")
         
         # Create a response with the file
-        # Create a response with the file
         response = make_response(send_file(expected_output_path, mimetype="application/pdf"))
         response.headers["Content-Disposition"] = f'attachment; filename="{expected_output_filename}"'
         response.headers["Content-Type"] = "application/pdf"
         response.headers["X-Content-Type-Options"] = "nosniff"
+        
+        # Add explicit CORS headers to ensure compatibility
+        response.headers["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        
         return response
     
     except Exception as e:
