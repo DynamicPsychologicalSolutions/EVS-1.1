@@ -1,56 +1,195 @@
-from flask import Flask, request, send_file, jsonify, render_template_string, make_response
+from flask import Flask, request, send_file, jsonify, render_template, render_template_string, make_response
+import subprocess
 import os
+import tempfile
 import logging
+import uuid
 import time
 from flask_cors import CORS
-from functools import wraps
 
-# Create the Flask app
-app = Flask(__name__)
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# Enable CORS for all routes
-CORS(app, supports_credentials=True)
+app = Flask(__name__, static_folder='.')
 
-# Simple authentication
-def check_auth(username, password):
-    """Check if a username/password combination is valid."""
-    # Replace with your actual credentials
-    return username == 'admin' and password == 'DarkBlue570'
+# Configure CORS properly for your Squarespace domain
+CORS(app, resources={
+    r"/*": {
+        "origins": ["https://www.dynamicpsych.net", "https://dynamicpsych.net", "http://www.dynamicpsych.net", "http://dynamicpsych.net"],
+        "methods": ["POST", "GET", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"]
+    }
+})
 
-def authenticate():
-    """Send a 401 response that prompts the user to authenticate."""
-    return make_response(
-        'Could not verify your access level for that URL.\n'
-        'You have to login with proper credentials', 401,
-        {'WWW-Authenticate': 'Basic realm="Login Required"'})
+@app.route("/", methods=["GET"])
+def index():
+    """Serve the index.html file."""
+    return send_file('index.html')
 
-def requires_auth(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        auth = request.authorization
-        if not auth or not check_auth(auth.username, auth.password):
-            return authenticate()
-        return f(*args, **kwargs)
-    return decorated
+@app.route("/health", methods=["GET"])
+def health_check():
+    """Endpoint for health checks."""
+    return jsonify({"status": "healthy", "timestamp": time.time()})
 
-# Your existing PDF processing route
-@app.route('/process-pdf', methods=['POST'])
+@app.route("/debug", methods=["GET"])
+def debug_info():
+    """Provide debug information."""
+    # List files in the current directory
+    files = os.listdir()
+    # Check if the base PDF exists
+    base_pdf_exists = os.path.exists("EVS_Base_1.1.pdf")
+    # Check if process_pdf.R exists and is executable
+    r_script_exists = os.path.exists("process_pdf.R")
+    r_script_executable = os.access("process_pdf.R", os.X_OK) if r_script_exists else False
+    
+    return jsonify({
+        "files": files,
+        "base_pdf_exists": base_pdf_exists,
+        "r_script_exists": r_script_exists,
+        "r_script_executable": r_script_executable,
+        "working_directory": os.getcwd()
+    })
+
+@app.route("/process-pdf", methods=["POST", "OPTIONS"])
 def process_pdf():
-    # Your existing PDF processing code here
-    # ...
-    pass
+    """
+    Process uploaded PDF using the R script and return the processed PDF.
+    Expects a multipart/form-data request with a 'file' field.
+    """
+    # Handle preflight OPTIONS request explicitly
+    if request.method == "OPTIONS":
+        response = make_response()
+        response.headers.add("Access-Control-Allow-Origin", "*")  # During development
+        response.headers.add("Access-Control-Allow-Headers", "Content-Type")
+        response.headers.add("Access-Control-Allow-Methods", "POST, OPTIONS")
+        response.headers.add("Access-Control-Max-Age", "3600")
+        return response
+        
+    try:
+        # Check if file was included in request
+        if 'file' not in request.files:
+            logger.error("No file part in the request")
+            return jsonify({"error": "No file part"}), 400
+        
+        file = request.files['file']
+        
+        # Check if user submitted an empty file
+        if file.filename == '':
+            logger.error("No file selected")
+            return jsonify({"error": "No file selected"}), 400
+        
+        # Check file extension
+        if not file.filename.lower().endswith('.pdf'):
+            logger.error(f"Invalid file type: {file.filename}")
+            return jsonify({"error": "Only PDF files are accepted"}), 400
+        
+        # Get the original filename without path
+        original_filename = os.path.basename(file.filename)
+        
+        # Create a unique ID for the input file to avoid conflicts
+        unique_id = str(uuid.uuid4())
+        
+        # Create storage directory if it doesn't exist
+        upload_dir = os.path.join(os.getcwd(), "uploads")
+        os.makedirs(upload_dir, exist_ok=True)
+        
+        # Save original file with unique ID prefix to avoid conflicts
+        input_path = os.path.join(upload_dir, f"input_{unique_id}_{original_filename}")
+        file.save(input_path)
+        
+        # Create a copy with just the original filename for R script processing
+        # This ensures the R script sees the correct filename
+        original_input_path = os.path.join(upload_dir, original_filename)
+        with open(input_path, 'rb') as src_file:
+            with open(original_input_path, 'wb') as dest_file:
+                dest_file.write(src_file.read())
+        
+        # The expected output format based on your R script pattern
+        expected_output_filename = f"EVS {original_filename} Report.pdf"
+        
+        logger.info(f"Processing file {original_filename}")
+        logger.info(f"Expecting output as: {expected_output_filename}")
+        
+        # Call R script with the original filename path
+        logger.info(f"Running R script with command: Rscript process_pdf.R {original_input_path} {expected_output_filename}")
+        process = subprocess.run(
+            ["Rscript", "--verbose", "process_pdf.R", original_input_path, expected_output_filename],
+            capture_output=True,
+            text=True
+        )
+        
+        # Log the output from R for debugging
+        logger.info(f"R stdout: {process.stdout}")
+        if process.stderr:
+            logger.error(f"R stderr: {process.stderr}")
+        
+        # Check if the R script execution was successful
+        if process.returncode != 0:
+            logger.error(f"R script failed: {process.stderr}")
+            return jsonify({
+                "error": "PDF processing failed", 
+                "details": process.stderr
+            }), 500
+        
+        logger.info(f"R script completed processing")
+        
+        # Look for the output file
+        expected_output_path = os.path.join(os.getcwd(), expected_output_filename)
+        
+        # Allow some time for the file to be generated
+        attempts = 0
+        while not os.path.exists(expected_output_path) and attempts < 5:
+            time.sleep(1)  # Wait for a second
+            attempts += 1
+            logger.info(f"Waiting for output file, attempt {attempts}")
+        
+        # Check if output file exists
+        if not os.path.exists(expected_output_path):
+            logger.error(f"Output file not found at {expected_output_path}")
+            # Try to look for similarly named files
+            similar_files = [f for f in os.listdir() if f.startswith("EVS") and f.endswith("Report.pdf")]
+            if similar_files:
+                logger.info(f"Found similar files: {similar_files}")
+                expected_output_path = os.path.join(os.getcwd(), similar_files[0])
+                expected_output_filename = os.path.basename(expected_output_path)
+            else:
+                return jsonify({"error": "Output file not generated"}), 500
+        
+        logger.info(f"Found output file at {expected_output_path}")
+        
+        # Create a response with the file
+        response = make_response(send_file(expected_output_path, mimetype="application/pdf"))
+        response.headers["Content-Disposition"] = f'attachment; filename="{expected_output_filename}"'
+        response.headers["Content-Type"] = "application/pdf"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        
+        # Add explicit CORS headers to ensure compatibility
+        response.headers["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        
+        return response
+    
+    except Exception as e:
+        logger.exception("An error occurred during processing")
+        return jsonify({"error": str(e)}), 500
+    
+    finally:
+        # Don't clean up files - retain them in the container
+        pass  # Remove the cleanup code to keep files
 
-# Add the file explorer route
+# --------------- NEW FILE EXPLORER FUNCTIONALITY ---------------
+
 @app.route('/secret-files')
-@requires_auth
 def file_explorer():
     """A simple file explorer to browse and download files."""
     # Set the base directory where processed PDFs are stored
-    base_dir = os.path.join(os.getcwd(), 'processed_pdfs')  # Change this to your actual storage directory
+    # We'll use the same uploads directory where the processed files are saved
+    base_dir = os.path.join(os.getcwd(), "uploads")
     
     # Create the directory if it doesn't exist
     if not os.path.exists(base_dir):
-        os.makedirs(base_dir)
+        os.makedirs(base_dir, exist_ok=True)
     
     # Get the requested directory path, default to base directory
     path = request.args.get('path', '')
@@ -87,6 +226,7 @@ def file_explorer():
                     'path': os.path.join(path, item) if path else item
                 })
     except Exception as e:
+        logger.error(f"Error accessing directory: {str(e)}")
         return f"Error accessing directory: {str(e)}", 500
     
     # Generate breadcrumb navigation
@@ -272,7 +412,6 @@ def file_explorer():
     )
 
 @app.route('/secret-download')
-@requires_auth
 def download_file():
     """Download a file from the server."""
     # Get the file path
@@ -281,7 +420,7 @@ def download_file():
         return "No file specified", 400
     
     # Set the base directory where processed PDFs are stored
-    base_dir = os.path.join(os.getcwd(), 'processed_pdfs')  # Change this to your actual storage directory
+    base_dir = os.path.join(os.getcwd(), "uploads")
     
     # Security check to prevent directory traversal
     full_path = os.path.normpath(os.path.join(base_dir, file_path))
@@ -301,10 +440,9 @@ def download_file():
 
 # Add a JSON API endpoint for programmatic access if needed
 @app.route('/api/secret-files')
-@requires_auth
 def list_files_api():
     """API endpoint to get a list of PDF files."""
-    base_dir = os.path.join(os.getcwd(), 'processed_pdfs')  # Change this to your actual storage directory
+    base_dir = os.path.join(os.getcwd(), "uploads")
     path = request.args.get('path', '')
     current_dir = os.path.normpath(os.path.join(base_dir, path))
     
@@ -344,9 +482,6 @@ def list_files_api():
         "current_path": path
     })
 
-# Make sure the app runs if this file is executed directly
-if __name__ == '__main__':
-    # Set up logging
-    logging.basicConfig(level=logging.INFO)
-    # Run the app - use environment variable PORT if available (for Cloud Run)
-    app.run(debug=True, host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
+if __name__ == "__main__":
+    # Run the Flask app when executed directly
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
