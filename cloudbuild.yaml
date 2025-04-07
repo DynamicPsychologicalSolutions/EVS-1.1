@@ -16,9 +16,9 @@ steps:
       - 'pdf-processor'
       - '--image=gcr.io/$PROJECT_ID/pdf-processor:$COMMIT_SHA'
       - '--platform=managed'
-      - '--region=us-central1'
+      - '--region=us-east4'
       - '--memory=4Gi'
-      - '--cpu=1'
+      - '--cpu=2'
       - '--allow-unauthenticated'
       - '--timeout=500s'
 
@@ -26,5 +26,5 @@ images:
   - 'gcr.io/$PROJECT_ID/pdf-processor:$COMMIT_SHA'
 
 options:
-  machineType: 'E2_HIGHCPU_32'
+  machineType: 'E2_HIGHCPU_8'
   logging: CLOUD_LOGGING_ONLY
