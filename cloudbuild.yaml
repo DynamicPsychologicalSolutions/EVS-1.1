@@ -18,7 +18,7 @@ steps:
       - '--platform=managed'
       - '--region=us-east4'
       - '--memory=4Gi'
-      - '--cpu=2'
+      - '--cpu=8'
       - '--allow-unauthenticated'
       - '--timeout=500s'
 
