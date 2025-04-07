@@ -931,10 +931,10 @@ dev.off()
 #
 #
 
-pdf_subset("EVS_base_1.1.pdf", pages = 1:3, output = "Page_0.pdf")
+pdf_subset("EVS_Base_1.1.pdf", pages = 1:3, output = "Page_0.pdf")
 
 # Extract the page
-pdf_subset("EVS_base_1.1.pdf", pages = 4, output = "temp_page1.pdf")
+pdf_subset("EVS_Base_1.1.pdf", pages = 4, output = "temp_page1.pdf")
 
 # Convert PDF to image to avoid font issues
 temp_image <- "temp_page.png"
@@ -961,7 +961,7 @@ file.remove("temp_page1.pdf", temp_image)
 #
 
 # Extract the page
-pdf_subset("EVS_base_1.1.pdf", pages = 5, output = "temp_page2.pdf")
+pdf_subset("EVS_Base_1.1.pdf", pages = 5, output = "temp_page2.pdf")
 
 # Convert PDF to image to avoid font issues
 temp_image <- "temp_page2.png"
@@ -988,7 +988,7 @@ file.remove("temp_page2.pdf", temp_image)
 #
 
 # Extract the page
-pdf_subset("EVS_base_1.1.pdf", pages = 6, output = "temp_page3.pdf")
+pdf_subset("EVS_Base_1.1.pdf", pages = 6, output = "temp_page3.pdf")
 
 # Convert PDF to image to avoid font issues
 temp_image <- "temp_page.png"
@@ -1015,7 +1015,7 @@ file.remove("temp_page3.pdf", temp_image)
 #
 
 # Extract the page
-pdf_subset("EVS_base_1.1.pdf", pages = 7, output = "temp_page4.pdf")
+pdf_subset("EVS_Base_1.1.pdf", pages = 7, output = "temp_page4.pdf")
 
 # Convert PDF to image to avoid font issues
 temp_image <- "temp_page.png"
@@ -1042,7 +1042,7 @@ file.remove("temp_page4.pdf", temp_image)
 #
 
 # Extract the page
-pdf_subset("EVS_base_1.1.pdf", pages = 8, output = "temp_page5.pdf")
+pdf_subset("EVS_Base_1.1.pdf", pages = 8, output = "temp_page5.pdf")
 
 # Convert PDF to image to avoid font issues
 temp_image <- "temp_page.png"
@@ -1069,7 +1069,7 @@ file.remove("temp_page5.pdf", temp_image)
 #
 
 # Extract the page
-pdf_subset("EVS_base_1.1.pdf", pages = 9, output = "temp_page6.pdf")
+pdf_subset("EVS_Base_1.1.pdf", pages = 9, output = "temp_page6.pdf")
 
 # Convert PDF to image to avoid font issues
 temp_image <- "temp_page.png"
@@ -1096,7 +1096,7 @@ file.remove("temp_page6.pdf", temp_image)
 #
 
 # Extract the page
-pdf_subset("EVS_base_1.1.pdf", pages = 10, output = "temp_page7.pdf")
+pdf_subset("EVS_Base_1.1.pdf", pages = 10, output = "temp_page7.pdf")
 
 # Convert PDF to image to avoid font issues
 temp_image <- "temp_page.png"
@@ -1123,7 +1123,7 @@ file.remove("temp_page7.pdf", temp_image)
 #
 
 # Extract the page
-pdf_subset("EVS_base_1.1.pdf", pages = 11, output = "temp_page8.pdf")
+pdf_subset("EVS_Base_1.1.pdf", pages = 11, output = "temp_page8.pdf")
 
 # Convert PDF to image to avoid font issues
 temp_image <- "temp_page.png"
