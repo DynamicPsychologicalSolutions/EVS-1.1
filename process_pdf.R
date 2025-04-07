@@ -413,9 +413,14 @@ text(-0.1, 0.8, table_text, cex = 1, pos = 4, xpd = TRUE)
 # TABLE INSERTION
 # Draw the table below the text
 # Move the viewport down to make space for the table
+if (!is.null(total_outliers)) {
 pushViewport(viewport(layout = grid.layout(3, 1, heights = unit(c(3, 7), "null"))))
 # Add the outlier table to the second section
 grid.table(outlier_report, rows = NULL, vp = viewport(x = 0.375, y = 0.6, width = 0.8, height = 0.8))
+} else {
+}
+
+
 
 # Close the PNG device to save the file
 dev.off()
@@ -529,7 +534,7 @@ bar_z <- ggplot(data, aes(x = Column, y = Z_Score, fill = Dataset)) +
   # Conditionally add horizontal lines if the max z-score exceeds the thresholds
   geom_hline(data = data.frame(yintercept = thresholds[thresholds <= max_z_score]), 
              aes(yintercept = yintercept), 
-             linetype = "dashed", color = "red", size = 0.5) +  # Add horizontal lines
+             linetype = "dashed", color = "red", linewidth = 0.5) +  # Add horizontal lines
   # Conditionally add annotations if the corresponding line exists
   {if (1.65 <= max_z_score) 
     annotate("text", x = 1.25, y = 1.65 + 0.1, label = "p = 0.05", color = "red", size = 3, fontface = "italic")
@@ -635,10 +640,10 @@ geom_bar(stat = "identity", position = position_dodge2(reverse = TRUE, padding =
   scale_y_discrete(limits = rev(new_headers)) +  # Reverse order for proper display
   geom_vline(data = data.frame(xintercept = thresholds[thresholds <= max_f_value]), 
              aes(xintercept = xintercept), 
-             linetype = "dashed", color = "red", size = 0.5) +  
+             linetype = "dashed", color = "red", linewidth = 0.5) +  
   geom_vline(data = data.frame(xintercept = 1.948), 
              aes(xintercept = xintercept), 
-             linetype = "dashed", color = "red", size = 0.5) +  
+             linetype = "dashed", color = "red", linewidth = 0.5) +  
   coord_cartesian(xlim = c(0, max(max(data$F_Value, na.rm = TRUE), 2.15))) +
   {if (0 <= max_f_value) 
     annotate("text", y = 16, x = 1.948 + 0.175, label = "p = 0.05", color = "red", size = 3, fontface = "italic")
@@ -926,10 +931,10 @@ dev.off()
 #
 #
 
-pdf_subset("EVS_Base_1.1.pdf", pages = 1:3, output = "Page_0.pdf")
+pdf_subset("EVS_base_1.1.pdf", pages = 1:3, output = "Page_0.pdf")
 
 # Extract the page
-pdf_subset("EVS_Base_1.1.pdf", pages = 4, output = "temp_page1.pdf")
+pdf_subset("EVS_base_1.1.pdf", pages = 4, output = "temp_page1.pdf")
 
 # Convert PDF to image to avoid font issues
 temp_image <- "temp_page.png"
@@ -956,7 +961,7 @@ file.remove("temp_page1.pdf", temp_image)
 #
 
 # Extract the page
-pdf_subset("EVS_Base_1.1.pdf", pages = 5, output = "temp_page2.pdf")
+pdf_subset("EVS_base_1.1.pdf", pages = 5, output = "temp_page2.pdf")
 
 # Convert PDF to image to avoid font issues
 temp_image <- "temp_page2.png"
@@ -983,7 +988,7 @@ file.remove("temp_page2.pdf", temp_image)
 #
 
 # Extract the page
-pdf_subset("EVS_Base_1.1.pdf", pages = 6, output = "temp_page3.pdf")
+pdf_subset("EVS_base_1.1.pdf", pages = 6, output = "temp_page3.pdf")
 
 # Convert PDF to image to avoid font issues
 temp_image <- "temp_page.png"
@@ -1010,7 +1015,7 @@ file.remove("temp_page3.pdf", temp_image)
 #
 
 # Extract the page
-pdf_subset("EVS_Base_1.1.pdf", pages = 7, output = "temp_page4.pdf")
+pdf_subset("EVS_base_1.1.pdf", pages = 7, output = "temp_page4.pdf")
 
 # Convert PDF to image to avoid font issues
 temp_image <- "temp_page.png"
@@ -1037,7 +1042,7 @@ file.remove("temp_page4.pdf", temp_image)
 #
 
 # Extract the page
-pdf_subset("EVS_Base_1.1.pdf", pages = 8, output = "temp_page5.pdf")
+pdf_subset("EVS_base_1.1.pdf", pages = 8, output = "temp_page5.pdf")
 
 # Convert PDF to image to avoid font issues
 temp_image <- "temp_page.png"
@@ -1064,7 +1069,7 @@ file.remove("temp_page5.pdf", temp_image)
 #
 
 # Extract the page
-pdf_subset("EVS_Base_1.1.pdf", pages = 9, output = "temp_page6.pdf")
+pdf_subset("EVS_base_1.1.pdf", pages = 9, output = "temp_page6.pdf")
 
 # Convert PDF to image to avoid font issues
 temp_image <- "temp_page.png"
@@ -1091,7 +1096,7 @@ file.remove("temp_page6.pdf", temp_image)
 #
 
 # Extract the page
-pdf_subset("EVS_Base_1.1.pdf", pages = 10, output = "temp_page7.pdf")
+pdf_subset("EVS_base_1.1.pdf", pages = 10, output = "temp_page7.pdf")
 
 # Convert PDF to image to avoid font issues
 temp_image <- "temp_page.png"
@@ -1118,7 +1123,7 @@ file.remove("temp_page7.pdf", temp_image)
 #
 
 # Extract the page
-pdf_subset("EVS_Base_1.1.pdf", pages = 11, output = "temp_page8.pdf")
+pdf_subset("EVS_base_1.1.pdf", pages = 11, output = "temp_page8.pdf")
 
 # Convert PDF to image to avoid font issues
 temp_image <- "temp_page.png"
