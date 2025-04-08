@@ -62,6 +62,9 @@ RUN pip3 install -r requirements.txt
 # Create uploads directory
 RUN mkdir -p /app/uploads
 
+# Add this if not already included
+RUN pip install --no-cache-dir google-cloud-storage
+
 # Expose port for Cloud Run
 EXPOSE 8080
 
