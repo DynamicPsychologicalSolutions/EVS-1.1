@@ -5,9 +5,9 @@ import tempfile
 import logging
 import uuid
 import time
+import datetime
 from flask_cors import CORS
 from google.cloud import storage
-import datetime
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -123,15 +123,14 @@ def process_pdf():
         # Get the original filename without path
         original_filename = os.path.basename(file.filename)
         
-        # Create a unique ID for the input file to avoid conflicts
-        unique_id = str(uuid.uuid4())
-        
         # Create storage directory if it doesn't exist
         upload_dir = os.path.join(os.getcwd(), "uploads")
         os.makedirs(upload_dir, exist_ok=True)
         
-        # Save original file with unique ID prefix to avoid conflicts
-        input_path = os.path.join(upload_dir, f"input_{unique_id}_{original_filename}")
+        # To prevent filename conflicts, add timestamp to the filename
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        input_filename = f"{timestamp}_{original_filename}"
+        input_path = os.path.join(upload_dir, input_filename)
         file.save(input_path)
         
         # Create a copy with just the original filename for R script processing
@@ -194,38 +193,16 @@ def process_pdf():
         
         logger.info(f"Found output file at {expected_output_path}")
         
-        # Upload to Google Cloud Storage
-        # Create a timestamp for organizing files
-        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        # Upload to Google Cloud Storage with simplified paths
+        # Use timestamps to prevent filename conflicts
         
-        # Save the input file
-        input_gcs_path = f"inputs/{timestamp}_{unique_id}/{original_filename}"
+        # Save the input file - use timestamp to avoid conflicts
+        input_gcs_path = f"inputs/{timestamp}_{original_filename}"
         upload_file_to_gcs(original_input_path, input_gcs_path)
         
-        # Save the output file
-        output_gcs_path = f"outputs/{timestamp}_{unique_id}/{expected_output_filename}"
+        # Save the output file - use timestamp to avoid conflicts
+        output_gcs_path = f"outputs/{timestamp}_{expected_output_filename}"
         upload_file_to_gcs(expected_output_path, output_gcs_path)
-        
-        # Create metadata for easy reference
-        metadata = {
-            "timestamp": timestamp,
-            "unique_id": unique_id,
-            "original_filename": original_filename,
-            "processed_filename": expected_output_filename,
-            "input_path": input_gcs_path,
-            "output_path": output_gcs_path
-        }
-        
-        # Save metadata to GCS for easier indexing
-        metadata_path = f"metadata/{timestamp}_{unique_id}_metadata.json"
-        metadata_file = os.path.join(tempfile.gettempdir(), f"{unique_id}_metadata.json")
-        
-        with open(metadata_file, 'w') as f:
-            import json
-            json.dump(metadata, f)
-        
-        # Upload metadata to GCS
-        upload_file_to_gcs(metadata_file, metadata_path, content_type="application/json")
         
         # Create a response with the file
         response = make_response(send_file(expected_output_path, mimetype="application/pdf"))
@@ -247,8 +224,146 @@ def process_pdf():
         # Don't clean up files - retain them in the container
         pass  # Remove the cleanup code to keep files
 
-# Rest of your code (file explorer functionality, etc.) remains unchanged
-# ...
+# --------------- FILE EXPLORER FUNCTIONALITY ---------------
+
+@app.route('/secret-files')
+def file_explorer():
+    """A simple file explorer to browse and download files."""
+    # Set the base directory where processed PDFs are stored
+    # We'll use the same uploads directory where the processed files are saved
+    base_dir = os.path.join(os.getcwd(), "uploads")
+    
+    # Create the directory if it doesn't exist
+    if not os.path.exists(base_dir):
+        os.makedirs(base_dir, exist_ok=True)
+    
+    # Get the requested directory path, default to base directory
+    path = request.args.get('path', '')
+    current_dir = os.path.normpath(os.path.join(base_dir, path))
+    
+    # Security check to prevent directory traversal
+    if not current_dir.startswith(base_dir):
+        return "Access denied: Directory traversal attempt", 403
+    
+    # Get files and directories
+    files = []
+    dirs = []
+    
+    try:
+        for item in os.listdir(current_dir):
+            item_path = os.path.join(current_dir, item)
+            if os.path.isfile(item_path):
+                # Get file stats
+                stats = os.stat(item_path)
+                size_kb = stats.st_size / 1024
+                mod_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(stats.st_mtime))
+                
+                # Only include PDF files
+                if item.lower().endswith('.pdf'):
+                    files.append({
+                        'name': item,
+                        'size': f"{size_kb:.1f} KB",
+                        'modified': mod_time,
+                        'path': os.path.join(path, item) if path else item
+                    })
+            elif os.path.isdir(item_path):
+                dirs.append({
+                    'name': item,
+                    'path': os.path.join(path, item) if path else item
+                })
+    except Exception as e:
+        logger.error(f"Error accessing directory: {str(e)}")
+        return f"Error accessing directory: {str(e)}", 500
+    
+    # Generate breadcrumb navigation
+    breadcrumbs = []
+    if path:
+        parts = path.split(os.sep)
+        for i in range(len(parts)):
+            crumb_path = os.sep.join(parts[:i+1])
+            breadcrumbs.append({
+                'name': parts[i],
+                'path': crumb_path
+            })
+
+    return render_template_string(
+        html_template, 
+        files=files, 
+        dirs=dirs, 
+        path=path, 
+        breadcrumbs=breadcrumbs
+    )
+
+@app.route('/secret-download')
+def download_file():
+    """Download a file from the server."""
+    # Get the file path
+    file_path = request.args.get('file', '')
+    if not file_path:
+        return "No file specified", 400
+    
+    # Set the base directory where processed PDFs are stored
+    base_dir = os.path.join(os.getcwd(), "uploads")
+    
+    # Security check to prevent directory traversal
+    full_path = os.path.normpath(os.path.join(base_dir, file_path))
+    
+    if not full_path.startswith(base_dir):
+        return "Access denied: Directory traversal attempt", 403
+    
+    if not os.path.isfile(full_path):
+        return "File not found", 404
+    
+    # Return the file
+    return send_file(
+        full_path,
+        as_attachment=True,
+        download_name=os.path.basename(full_path)
+    )
+
+# Add a JSON API endpoint for programmatic access if needed
+@app.route('/api/secret-files')
+def list_files_api():
+    """API endpoint to get a list of PDF files."""
+    base_dir = os.path.join(os.getcwd(), "uploads")
+    path = request.args.get('path', '')
+    current_dir = os.path.normpath(os.path.join(base_dir, path))
+    
+    # Security check
+    if not current_dir.startswith(base_dir):
+        return jsonify({"error": "Access denied: Directory traversal attempt"}), 403
+    
+    files = []
+    dirs = []
+    
+    try:
+        for item in os.listdir(current_dir):
+            item_path = os.path.join(current_dir, item)
+            if os.path.isfile(item_path) and item.lower().endswith('.pdf'):
+                stats = os.stat(item_path)
+                size_kb = stats.st_size / 1024
+                mod_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(stats.st_mtime))
+                
+                files.append({
+                    'name': item,
+                    'size': f"{size_kb:.1f} KB",
+                    'modified': mod_time,
+                    'path': os.path.join(path, item) if path else item,
+                    'download_url': f"/secret-download?file={os.path.join(path, item) if path else item}"
+                })
+            elif os.path.isdir(item_path):
+                dirs.append({
+                    'name': item,
+                    'path': os.path.join(path, item) if path else item
+                })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    
+    return jsonify({
+        "files": files,
+        "directories": dirs,
+        "current_path": path
+    })
 
 if __name__ == "__main__":
     # Run the Flask app when executed directly
