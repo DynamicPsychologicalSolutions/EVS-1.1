@@ -658,6 +658,93 @@ ggsave("bar_f.png", bar_f, width = 7.5, height = 8, dpi = 250)
 
 
 #
+# BAR GRAPH 3
+#
+
+# Assuming obj_matrix and sub_matrix are data frames or matrices with 14 columns
+
+# Step 1: Calculate subjective data values
+sub_col_means <- colMeans(sub_matrix, na.rm = TRUE)
+sub_mean_of_means <- mean(sub_col_means)
+sub_sd_of_means <- sd(sub_col_means)
+sub_z_scores <- (sub_col_means - sub_mean_of_means) / sub_sd_of_means
+
+# Step 2: Calculate objective data values
+for (i in seq_len(ncol(obj_matrix))) {
+   obj_matrix[is.na(obj_matrix[, i]), i] <- mean(obj_matrix[, i], na.rm = TRUE)
+}
+obj_matrix_percent <- obj_matrix / sum(obj_matrix) * 100
+obj_col_percent_sums <- colSums(obj_matrix_percent)
+obj_mean_percent_sums <- mean(obj_col_percent_sums)
+obj_sd_percent_sums <- sd(obj_col_percent_sums)
+obj_z_scores <- (obj_col_percent_sums - obj_mean_percent_sums) / obj_sd_percent_sums
+
+# Step 3: Calculate varZ for both datasets
+obj_varZ <- 0.107 + (obj_z_scores^2 / 300)
+sub_varZ <- 0.107 + (sub_z_scores^2 / 300)
+
+# Step 4: Calculate Z. statistic for each category
+Z_dot <- ((obj_z_scores / obj_varZ) + (sub_z_scores / sub_varZ)) / (1/obj_varZ + 1/sub_varZ)
+
+# Step 5: Calculate Qz statistic for each category
+Qz <- (1/obj_varZ * (obj_z_scores - Z_dot)^2) + (1/sub_varZ * (sub_z_scores - Z_dot)^2)
+
+# Define the category names with a spacer between female and male categories
+new_headers <- c("Senior Female (Fsen)", "Mature Female (Fmat)", "Adult Female (Fadl)", "Juvenile Female (Fjuv)", 
+                "Pre-Juvenile Female (Fpjv)   .", "Small Child Female (Fsmc)", "Infant Female (Finf)",
+                " ", "Senior Male (Msen)", "Mature Male (Mmat)", "Adult Male (Madl)", "Juvenile Male (Mjuv)", 
+                "Pre-Juvenile Male (Mpjv)", "Small Child Male (Msmc)", "Infant Male (Minf)")
+
+# Create a data frame for plotting Qz values
+data <- data.frame(
+  Column = new_headers[new_headers != " "],  # Exclude the spacer for data
+  Qz_Value = Qz,
+  Dataset = "Discrepancy"  # Single dataset for Qz values
+)
+
+# Find the maximum Qz value for setting the plot limits
+max_qz_value <- max(Qz, na.rm = TRUE)
+
+# Define the thresholds for chi-square critical values
+thresholds <- c(3.841, 6.635, 10.828)
+
+# Create the horizontal bar graph
+bar_qz <- ggplot(data, aes(y = Column, x = Qz_Value, fill = Dataset)) +
+  geom_bar(stat = "identity", position = "dodge", na.rm = TRUE, fill = "orange", width = 0.4) +  # Width reduced to 0.4 for narrower bars
+  labs(
+    title = "Between-Groups Variance Test Within Categories",
+    y = "Age/Gender Groups",  
+    x = "Qz Value"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = -5, face = "bold", size = 16),
+    axis.text.y = element_text(size = 8),  
+    axis.title.y = element_text(vjust = 1),  
+    panel.grid.major.y = element_blank(),  
+    legend.position = "none",  # Remove legend since we only have one dataset
+    plot.margin = margin(t = 50, r = 20, b = 10, l = 10)  # Add extra top padding for annotations
+  ) +
+  # Create a vector with all categories including the spacer in the correct position
+  scale_y_discrete(limits = rev(c(new_headers[1:7], " ", new_headers[9:15]))) +  # Include spacer and reverse
+  # Add vertical lines for thresholds that are within range
+  geom_vline(data = data.frame(xintercept = thresholds[thresholds <= max(max_qz_value, 11)]), 
+             aes(xintercept = xintercept), 
+             linetype = "dashed", color = "darkred", linewidth = 0.5) +
+  # Set x-axis limits to fixed maximum of 12.5
+  coord_cartesian(xlim = c(0, 12.5)) +
+  # Add annotations for thresholds with dark red color (positioned at the top with y adjusted for padding)
+  annotate("text", y = 15.5, x = 3.841 + 0.66, 
+           label = "p = 0.05", color = "darkred", size = 3, fontface = "italic") +
+  annotate("text", y = 15.5, x = 6.635 + 0.66, 
+           label = "p = 0.01", color = "darkred", size = 3, fontface = "italic") +
+  annotate("text", y = 15.5, x = 10.828 + 0.66, 
+           label = "p = 0.001", color = "darkred", size = 3, fontface = "italic")
+
+# Save the plot
+ggsave("bar_qz.png", bar_qz, width = 7.5, height = 8, dpi = 250)
+
+#
 # OBJECTIVE SILHOUETTE
 #
 
@@ -1026,10 +1113,10 @@ pdf_convert("temp_page4.pdf",
 
 # Read the converted image and the bar image
 page <- image_read(temp_image)
-overlay <- image_read("obj_sil.png")
+overlay <- image_read("bar_qz.png")
 
 # Composite the images
-result <- image_composite(page, overlay, offset = "+100+275")
+result <- image_composite(page, overlay, offset = "+150+350")
 
 # Save the result as PDF
 image_write(result, "Page_4.pdf", format = "pdf")
@@ -1053,7 +1140,7 @@ pdf_convert("temp_page5.pdf",
 
 # Read the converted image and the bar image
 page <- image_read(temp_image)
-overlay <- image_read("obj_dend.png")
+overlay <- image_read("obj_sil.png")
 
 # Composite the images
 result <- image_composite(page, overlay, offset = "+100+275")
@@ -1080,7 +1167,7 @@ pdf_convert("temp_page6.pdf",
 
 # Read the converted image and the bar image
 page <- image_read(temp_image)
-overlay <- image_read("sub_sil.png")
+overlay <- image_read("obj_dend.png")
 
 # Composite the images
 result <- image_composite(page, overlay, offset = "+100+275")
@@ -1107,7 +1194,7 @@ pdf_convert("temp_page7.pdf",
 
 # Read the converted image and the bar image
 page <- image_read(temp_image)
-overlay <- image_read("sub_dend.png")
+overlay <- image_read("sub_sil.png")
 
 # Composite the images
 result <- image_composite(page, overlay, offset = "+100+275")
@@ -1134,10 +1221,10 @@ pdf_convert("temp_page8.pdf",
 
 # Read the converted image and the bar image
 page <- image_read(temp_image)
-overlay <- image_read("tangle.png")
+overlay <- image_read("sub_dend.png")
 
 # Composite the images
-result <- image_composite(page, overlay, offset = "+100+240")
+result <- image_composite(page, overlay, offset = "+100+275")
 
 # Save the result as PDF
 image_write(result, "Page_8.pdf", format = "pdf")
@@ -1148,8 +1235,35 @@ file.remove("temp_page8.pdf", temp_image)
 #
 #
 #
-file.remove("intro_page.png", "bar_z.png", "bar_f.png", "obj_sil.png", "obj_dend.png", "sub_sil.png", "sub_dend.png", "tangle.png")
-pdf_combine(c("Page_0.pdf", "Page_1.pdf", "Page_2.pdf", "Page_3.pdf", "Page_4.pdf", "Page_5.pdf", "Page_6.pdf", "Page_7.pdf", "Page_8.pdf"), output = paste("EVS", text_name, "Report.pdf"))
-file.remove("Page_0.pdf", "Page_1.pdf", "Page_2.pdf", "Page_3.pdf", "Page_4.pdf", "Page_5.pdf", "Page_6.pdf", "Page_7.pdf", "Page_8.pdf")
+
+# Extract the page
+pdf_subset("EVS_Base_1.1.pdf", pages = 12, output = "temp_page9.pdf")
+
+# Convert PDF to image to avoid font issues
+temp_image <- "temp_page.png"
+pdf_convert("temp_page9.pdf", 
+            dpi = 250,  # Higher DPI for better quality
+            format = "png", 
+            filenames = temp_image)
+
+# Read the converted image and the bar image
+page <- image_read(temp_image)
+overlay <- image_read("tangle.png")
+
+# Composite the images
+result <- image_composite(page, overlay, offset = "+100+240")
+
+# Save the result as PDF
+image_write(result, "Page_9.pdf", format = "pdf")
+
+# Optional: Clean up temporary files
+file.remove("temp_page9.pdf", temp_image)
+
+#
+#
+#
+file.remove("intro_page.png", "bar_z.png", "bar_f.png", "obj_sil.png", "obj_dend.png", "sub_sil.png", "sub_dend.png", "tangle.png", "bar_qz.png")
+pdf_combine(c("Page_0.pdf", "Page_1.pdf", "Page_2.pdf", "Page_3.pdf", "Page_4.pdf", "Page_5.pdf", "Page_6.pdf", "Page_7.pdf", "Page_8.pdf", "Page_9.pdf"), output = paste("EVS", text_name, "Report.pdf"))
+file.remove("Page_0.pdf", "Page_1.pdf", "Page_2.pdf", "Page_3.pdf", "Page_4.pdf", "Page_5.pdf", "Page_6.pdf", "Page_7.pdf", "Page_8.pdf", "Page_9.pdf")
 
 
