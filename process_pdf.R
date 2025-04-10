@@ -708,9 +708,12 @@ max_qz_value <- max(Qz, na.rm = TRUE)
 # Define the thresholds for chi-square critical values
 thresholds <- c(3.841, 6.635, 10.828)
 
+# Set dynamic x-axis limit, capped at 12.5
+x_axis_limit <- min(max_qz_value * 1.1, 12.5)  # Adding 10% padding but capping at 12.5
+
 # Create the horizontal bar graph
 bar_qz <- ggplot(data, aes(y = Column, x = Qz_Value, fill = Dataset)) +
-  geom_bar(stat = "identity", position = "dodge", na.rm = TRUE, fill = "orange", width = 0.4) +  # Width reduced to 0.4 for narrower bars
+  geom_bar(stat = "identity", position = "dodge", na.rm = TRUE, fill = "orange", width = 0.4) +
   labs(
     title = "Between-Groups Variance Test Within Categories",
     y = "Age/Gender Groups",  
@@ -722,18 +725,16 @@ bar_qz <- ggplot(data, aes(y = Column, x = Qz_Value, fill = Dataset)) +
     axis.text.y = element_text(size = 8),  
     axis.title.y = element_text(vjust = 1),  
     panel.grid.major.y = element_blank(),  
-    legend.position = "none",  # Remove legend since we only have one dataset
-    plot.margin = margin(t = 50, r = 20, b = 10, l = 10)  # Add extra top padding for annotations
+    legend.position = "none",
+    plot.margin = margin(t = 50, r = 20, b = 10, l = 10)
   ) +
-  # Create a vector with all categories including the spacer in the correct position
-  scale_y_discrete(limits = rev(c(new_headers[1:7], " ", new_headers[9:15]))) +  # Include spacer and reverse
-  # Add vertical lines for thresholds that are within range
-  geom_vline(data = data.frame(xintercept = thresholds[thresholds <= max(max_qz_value, 11)]), 
+  scale_y_discrete(limits = rev(c(new_headers[1:7], " ", new_headers[9:15]))) +
+  geom_vline(data = data.frame(xintercept = thresholds[thresholds <= x_axis_limit]), 
              aes(xintercept = xintercept), 
              linetype = "dashed", color = "darkred", linewidth = 0.5) +
-  # Set x-axis limits to fixed maximum of 12.5
-  coord_cartesian(xlim = c(0, 12.5)) +
-  # Add annotations for thresholds with dark red color (positioned at the top with y adjusted for padding)
+  # Set x-axis limits to dynamic maximum, capped at 12.5
+  coord_cartesian(xlim = c(0, x_axis_limit)) +
+  # Add annotations for thresholds that are within the display range
   annotate("text", y = 15.5, x = 3.841 + 0.66, 
            label = "p = 0.05", color = "darkred", size = 3, fontface = "italic") +
   annotate("text", y = 15.5, x = 6.635 + 0.66, 
